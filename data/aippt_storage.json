@@ -1,0 +1,109 @@
+{
+  "cookies": [
+    {
+      "name": "acw_tc",
+      "value": "0a00854017592135211067177e42c8c72fb2c77202f15a6beae04d89305b84",
+      "domain": "www.aippt.cn",
+      "path": "/",
+      "expires": 1759215321.418367,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "HMACCOUNT_BFESS",
+      "value": "79ABF11B20F12325",
+      "domain": ".hm.baidu.com",
+      "path": "/",
+      "expires": 1793773521.875488,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "Hm_lvt_1c6cd93d6d3ed5246137eba0baf732a9",
+      "value": "1759213522",
+      "domain": ".aippt.cn",
+      "path": "/",
+      "expires": 1790749537,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "HMACCOUNT",
+      "value": "79ABF11B20F12325",
+      "domain": ".aippt.cn",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "main",
+      "value": "%7B%22_authToken%22%3A%22eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VySWQiOjEyNTA4NzczLCJVdUlkIjoiMjk2MzJlOTQtYTExMy00YTMwLTkzNzAtZTRkMzBlNDMwMTRjIiwiTG9naW5QbGF0Zm9ybSI6MCwiZXhwIjoxNzY2OTg5NTM2LCJpc3MiOiJBaVBQVF9PeVgyVHoifQ.Ol9dq6oEaJ_86_5JKzehJUJxNN50EbCqsSay3VWLx5M%22%2C%22user%22%3Anull%2C%22language%22%3A%22zh%22%2C%22userLoading%22%3Atrue%2C%22aiTextCredits%22%3A%7B%22todayUse%22%3A0%2C%22todayRemains%22%3A0%2C%22totalRemains%22%3A0%7D%2C%22headerSearchVisible%22%3Atrue%2C%22isAbnormalAccountWarning%22%3Afalse%2C%22isAbnormalAccountBannedSevenDays%22%3Afalse%2C%22isAbnormalAccountBannedAllTime%22%3Afalse%2C%22abnormalAccountDetail%22%3Anull%2C%22earnMoneyVisible%22%3Atrue%7D",
+      "domain": "www.aippt.cn",
+      "path": "/",
+      "expires": 1761805522,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "Hm_lpvt_1c6cd93d6d3ed5246137eba0baf732a9",
+      "value": "1759213537",
+      "domain": ".aippt.cn",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "i18n_redirected",
+      "value": "zh-CN",
+      "domain": "www.aippt.cn",
+      "path": "/",
+      "expires": 1790749537,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://www.aippt.cn",
+      "localStorage": [
+        {
+          "name": "login_result_token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VySWQiOjEyNTA4NzczLCJVdUlkIjoiMjk2MzJlOTQtYTExMy00YTMwLTkzNzAtZTRkMzBlNDMwMTRjIiwiTG9naW5QbGF0Zm9ybSI6MCwiZXhwIjoxNzY2OTg5NTM2LCJpc3MiOiJBaVBQVF9PeVgyVHoifQ.Ol9dq6oEaJ_86_5JKzehJUJxNN50EbCqsSay3VWLx5M"
+        },
+        {
+          "name": "uniqueDateUUID",
+          "value": "{\"uuid\":\"283c5a5c-acd7-424e-aa11-6a1aa0d68be5\",\"date\":\"2025-09-30\",\"count\":1}"
+        },
+        {
+          "name": "protocolCheck",
+          "value": "false"
+        },
+        {
+          "name": "Hm_lvt_1c6cd93d6d3ed5246137eba0baf732a9",
+          "value": "1790749537422|1759213522"
+        },
+        {
+          "name": "deviceId",
+          "value": "S8FYRj4pUvQ3BGXQvzY9Txc9atXBmP"
+        },
+        {
+          "name": "sensorsLoginType",
+          "value": "account"
+        },
+        {
+          "name": "fingerPrintId",
+          "value": "9a778812fcd4fdb30b80dbe3839ecb78"
+        }
+      ]
+    }
+  ]
+}

@@ -17,7 +17,11 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
   const headless = options.headless ?? (headlessEnv ? headlessEnv !== 'false' : true);
   const slowMo = options.slowMo ?? (headless ? 0 : 200);
   const browser = await chromium.launch({ headless, slowMo });
-  const context = await browser.newContext({ acceptDownloads: true });
+  // Persist session between runs via storage state
+  const dataDir = path.join(process.cwd(), 'data');
+  try { fs.mkdirSync(dataDir, { recursive: true }); } catch (_) {}
+  const stateFile = path.join(dataDir, 'aippt_storage.json');
+  const context = await browser.newContext({ acceptDownloads: true, storageState: fs.existsSync(stateFile) ? stateFile : undefined });
   const page = await context.newPage();
   try {
     // Log console messages for debugging
@@ -183,6 +187,8 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       }
       await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
       await waitForPageSettled(1200);
+      // Save storage state after login so future runs reuse the session
+      try { await context.storageState({ path: stateFile }); } catch (_) {}
       // After login, click immediate download with retries to handle slow rendering
       for (let i = 0; i < 6 && !download; i++) {
         download = await clickImmediateDownload().catch(() => null);
