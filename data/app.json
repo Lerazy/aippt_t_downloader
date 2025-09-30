@@ -1,0 +1,41 @@
+{
+  "tokens": [
+    {
+      "id": 1,
+      "token": "fCn0ZMhQQdv0yHLqoHbTA1ep",
+      "max_downloads": 2,
+      "downloads_used": 0,
+      "expires_at": null,
+      "note": "",
+      "created_at": "2025-09-29T17:25:41.196Z"
+    },
+    {
+      "id": 2,
+      "token": "k5NkmmboP4tltNx82XIdvOLi",
+      "max_downloads": 2,
+      "downloads_used": 0,
+      "expires_at": null,
+      "note": "",
+      "created_at": "2025-09-29T17:26:44.600Z"
+    },
+    {
+      "id": 3,
+      "token": "C2LGZQ-KsWbJyYVhorVq3YDW",
+      "max_downloads": 2,
+      "downloads_used": 0,
+      "expires_at": null,
+      "note": "",
+      "created_at": "2025-09-29T17:26:44.600Z"
+    },
+    {
+      "id": 4,
+      "token": "mLGnTurYr4KUeUUX173OT67O",
+      "max_downloads": 2,
+      "downloads_used": 0,
+      "expires_at": null,
+      "note": "",
+      "created_at": "2025-09-29T17:26:44.600Z"
+    }
+  ],
+  "seq": 4
+}
