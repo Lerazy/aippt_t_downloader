@@ -2,29 +2,61 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>管理后台 - 链接生成</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; margin: 32px; }
-    .container { max-width: 900px; margin: 0 auto; }
-    h1 { margin-bottom: 16px; }
-    form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-    label { display: flex; flex-direction: column; font-weight: 600; }
-    input, textarea { padding: 8px; font-size: 14px; }
-    button { padding: 10px 16px; font-size: 14px; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { border: 1px solid #ddd; padding: 8px; }
-    th { background: #f7f7f7; text-align: left; }
-    code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
+    :root {
+      --bg: #121826;
+      --panel: #182235;
+      --panel-2: #1a2740;
+      --muted: #9fb0c8;
+      --text: #f2f6fb;
+      --accent: #5b8cff;
+      --accent-2: #7aefbd;
+      --danger: #ff6b6b;
+      --ring: rgba(91,140,255,0.38);
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --border: rgba(255,255,255,0.16);
+    }
+    body {
+      margin: 0; padding: 24px; color: var(--text);
+      background: radial-gradient(1200px 800px at 10% 10%, rgba(91,140,255,0.07), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(122,239,189,0.06), transparent 60%),
+                  var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    }
+    .container { max-width: 1060px; margin: 0 auto; }
+    .panel { background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); backdrop-filter: blur(8px); }
+    h1 { margin: 0 0 16px; text-align:center; }
+    p.sub { margin: -4px 0 18px; text-align:center; color: var(--muted); }
+    form { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+    label { display: flex; flex-direction: column; font-weight: 600; font-size: 13px; gap: 6px; }
+    input, textarea {
+      padding: 10px 12px; font-size: 14px; color: var(--text); background: var(--panel);
+      border: 1px solid var(--border); border-radius: 10px; outline: none; transition: box-shadow .2s, border-color .2s, background .2s;
+    }
+    input:focus, textarea:focus { box-shadow: 0 0 0 4px var(--ring); border-color: var(--accent); background: #1d2a40; }
+    button { padding: 10px 16px; font-size: 14px; cursor: pointer; border: none; border-radius: 10px; color: #fff; background: linear-gradient(135deg, var(--accent), #2e6bff); box-shadow: 0 6px 18px rgba(91,140,255,0.35); }
+    button:hover { filter: brightness(1.05); }
     .row-1col { grid-column: span 2; }
-    .links { background: #fbfbfb; border: 1px dashed #ddd; padding: 12px; }
+    .links { background: var(--panel-2); border: 1px dashed var(--border); padding: 12px; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; overflow: hidden; border-radius: 10px; }
+    th, td { border: 1px solid var(--border); padding: 10px; }
+    th { background: #0f1724; text-align: left; color: var(--muted); font-weight: 600; }
+    tr:nth-child(odd) td { background: rgba(255,255,255,0.04); }
+    code { background: #0f1724; padding: 2px 6px; border-radius: 6px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin: 10px 0; }
+    .toolbar input { flex: 1; }
+    .btn-danger { background: linear-gradient(135deg, var(--danger), #e25555); box-shadow: 0 6px 18px rgba(255,107,107,0.25); }
+    @media (max-width: 900px) { form { grid-template-columns: 1fr; } .row-1col { grid-column: span 1; } }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>管理后台</h1>
-    <p>生成含 token 的下载链接。生成后复制分发给用户。</p>
-    <form id="genForm">
+    <div class="panel" style="margin-bottom:16px">
+      <h1>管理后台</h1>
+      <p class="sub">生成含 token 的下载链接，支持搜索与删除</p>
+      <form id="genForm">
       <label>
         生成数量
         <input type="number" min="1" max="1000" name="count" value="1" />
@@ -44,11 +76,18 @@
       <div class="row-1col">
         <button type="submit">生成链接</button>
       </div>
-    </form>
-    <div id="created" class="links" style="display:none"></div>
+      </form>
+      <div id="created" class="links" style="display:none"></div>
+    </div>
 
-    <h2>链接列表</h2>
-    <table id="tbl">
+    <div class="panel">
+      <h2 style="margin:0 0 8px">链接列表</h2>
+      <div class="toolbar">
+        <input id="search" placeholder="搜索 token 或备注" />
+        <button id="btnSearch">搜索</button>
+        <button id="btnClear">清空</button>
+      </div>
+      <table id="tbl">
       <thead>
         <tr>
           <th>Token</th>
@@ -58,14 +97,18 @@
           <th>备注</th>
           <th>创建时间</th>
           <th>链接</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody></tbody>
-    </table>
+      </table>
+    </div>
   </div>
   <script>
     async function refresh() {
-      const res = await fetch('/api/admin/links');
+      const q = document.getElementById('search').value.trim();
+      const url = q ? `/api/admin/links?q=${encodeURIComponent(q)}` : '/api/admin/links';
+      const res = await fetch(url);
       const json = await res.json();
       const tbody = document.querySelector('#tbl tbody');
       tbody.innerHTML = '';
@@ -80,8 +123,22 @@
           <td>${r.note ?? ''}</td>
           <td>${new Date(r.created_at).toLocaleString()}</td>
           <td><a href="${url}" target="_blank">打开</a></td>
+          <td><button data-token="${r.token}" class="btnDel">删除</button></td>
         `;
         tbody.appendChild(tr);
+      });
+      // bind delete buttons
+      document.querySelectorAll('.btnDel').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const token = e.currentTarget.getAttribute('data-token');
+          if (!confirm(`确定删除 token: ${token} ?`)) return;
+          const resp = await fetch(`/api/admin/links/${encodeURIComponent(token)}`, { method: 'DELETE' });
+          if (!resp.ok) {
+            const t = await resp.text();
+            alert(t || '删除失败');
+          }
+          refresh();
+        });
       });
     }
     refresh();
@@ -103,6 +160,9 @@
       }
       refresh();
     });
+
+    document.getElementById('btnSearch').addEventListener('click', () => refresh());
+    document.getElementById('btnClear').addEventListener('click', () => { document.getElementById('search').value=''; refresh(); });
   </script>
   </body>
   </html>

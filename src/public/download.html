@@ -2,28 +2,118 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>下载模版</title>
   <style>
-    body { display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;background-color: #010101; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; }
-    .card { width: 560px; max-width: 92vw; border: 1px solid #eaeaea; border-radius: 10px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    h1 { font-size: 20px; margin: 0 0 16px; text-align: center; }
-    input { width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; }
-    button { margin-top: 12px; width: 100%; padding: 12px; font-size: 15px; background: #2e6bff; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-    button:disabled { background: #999; cursor: not-allowed; }
-    .msg { margin-top: 8px; min-height: 24px; text-align: center; color: #d33; }
+    :root {
+      --bg: #121826; /* slightly lighter than pure black */
+      --panel: #182235; /* lighter panel for contrast */
+      --muted: #9fb0c8; /* brighter muted text */
+      --text: #f2f6fb; /* high-contrast text */
+      --accent: #5b8cff; /* primary blue */
+      --accent-2: #7aefbd; /* mint */
+      --danger: #ff6b6b;
+      --ring: rgba(91,140,255,0.38);
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+    }
+    html, body { height: 100%; }
+    body {
+      display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;
+      background: radial-gradient(1200px 800px at 10% 10%, rgba(91,140,255,0.10), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(122,239,189,0.09), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      padding: 24px;
+    }
+    .card {
+      width: 720px; max-width: 100%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 14px; padding: 24px; box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+    }
+    h1 { font-size: 22px; margin: 0 0 16px; text-align: center; }
+    p.sub { margin: -8px 0 16px; text-align:center; color: var(--muted); font-size: 13px; }
+    .row { display:flex; gap: 12px; align-items: center; justify-content: center; width: 100%; }
+    .row > * { flex: 1; }
+    input {
+      width: 100%; padding: 12px 14px; font-size: 14px;
+      background: var(--panel); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+      outline: none; transition: box-shadow .2s, border-color .2s;
+    }
+    input:focus { box-shadow: 0 0 0 4px var(--ring); border-color: var(--accent); background: #1d2a40; }
+    button {
+      padding: 12px 16px; font-size: 15px; border: none; border-radius: 10px; cursor: pointer; white-space: nowrap;
+      background: linear-gradient(135deg, var(--accent), #2e6bff);
+      color: #fff; box-shadow: 0 6px 18px rgba(91,140,255,0.35);
+      transition: transform .1s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    button:active { transform: translateY(0); }
+    button:disabled { background: #42557a; cursor: not-allowed; box-shadow: none; }
+    .actions { display:flex; gap: 12px; }
+    .msg { margin-top: 10px; min-height: 24px; text-align: center; color: var(--danger); }
+    #quota { color: var(--accent-2) !important; }
+    .tips { margin-top: 12px; font-size: 12px; color: var(--muted); text-align:center; }
+    @media (max-width: 720px) { .row { flex-direction: column; } .actions { flex-direction: column; } }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>下载模版</h1>
-    <input id="tplUrl" placeholder="请输入需要下载模版的链接" style="margin-top:8px" />
-    <button id="btn">下载模版</button>
+    <p class="sub">粘贴 aippt 模板地址，系统将自动登录并下载</p>
+    <div class="row" style="margin-top:10px">
+      <input id="tplUrl" placeholder="请输入需要下载模版的链接" />
+      <div class="actions">
+        <button id="btn">下载模版</button>
+      </div>
+    </div>
     <div id="msg" class="msg"></div>
+    <div id="quota" class="msg" style="min-height:20px"></div>
   </div>
   <script>
     const btn = document.getElementById('btn');
     const msg = document.getElementById('msg');
+    const quota = document.getElementById('quota');
+    let currentToken = null;
+    async function refreshQuota() {
+      if (!currentToken) return;
+      try {
+        const res = await fetch(`/api/token/${encodeURIComponent(currentToken)}`);
+        const json = await res.json().catch(() => ({}));
+        if (!json.valid) {
+          quota.textContent = '';
+          return;
+        }
+        if (json.max_downloads == null) {
+          quota.textContent = '剩余下载次数：不限';
+        } else {
+          quota.textContent = `剩余下载次数：${json.remaining}`;
+        }
+      } catch (_) {}
+    }
+    // Validate token on load and disable if invalid
+    (async () => {
+      try {
+        const u = new URL(location.href);
+        const token = u.searchParams.get('token');
+        currentToken = token;
+        if (!token) {
+          msg.textContent = '缺少 token，无法下载';
+          btn.disabled = true;
+          return;
+        }
+        const res = await fetch(`/api/token/${encodeURIComponent(token)}`);
+        const json = await res.json().catch(() => ({}));
+        if (!json.valid) {
+          msg.textContent = '该链接无效或已过期/次数已用完';
+          btn.disabled = true;
+        } else { await refreshQuota(); }
+      } catch (e) {}
+    })();
 
     btn.addEventListener('click', async () => {
       const u = document.getElementById('tplUrl').value;
@@ -58,6 +148,8 @@
       a.remove();
       URL.revokeObjectURL(urlObj);
       msg.textContent = '';
+      // refresh remaining count after a short delay to allow server write
+      setTimeout(refreshQuota, 500);
     });
   </script>
 </body>

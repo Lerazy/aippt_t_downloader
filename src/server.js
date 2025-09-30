@@ -66,8 +66,31 @@ function isTokenValid(tokenRow) {
 // Admin APIs
 app.get('/api/admin/links', requireAdminAuth, async (req, res) => {
   await db.read();
-  const rows = [...db.data.tokens].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const q = (req.query.q || '').toString().trim();
+  let rows = [...db.data.tokens];
+  if (q) {
+    const qLower = q.toLowerCase();
+    rows = rows.filter(r =>
+      (r.token && r.token.toLowerCase().includes(qLower)) ||
+      (r.note && r.note.toLowerCase().includes(qLower))
+    );
+  }
+  rows.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   res.json({ data: rows });
+});
+
+// Delete token by token string
+app.delete('/api/admin/links/:token', requireAdminAuth, async (req, res) => {
+  const { token } = req.params;
+  await db.read();
+  const before = db.data.tokens.length;
+  db.data.tokens = db.data.tokens.filter(t => t.token !== token);
+  const after = db.data.tokens.length;
+  if (after === before) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  await db.write();
+  return res.json({ ok: true });
 });
 
 app.post('/api/admin/links', requireAdminAuth, async (req, res) => {
@@ -107,7 +130,18 @@ app.get('/api/token/:token', async (req, res) => {
   const row = db.data.tokens.find(t => t.token === token);
   const validity = isTokenValid(row);
   if (!validity.ok) return res.status(404).json({ valid: false });
-  res.json({ valid: true });
+  const max = row.max_downloads != null ? Number(row.max_downloads) : null;
+  const used = Number(row.downloads_used || 0);
+  const remaining = max != null ? Math.max(0, max - used) : null;
+  res.json({
+    valid: true,
+    token: row.token,
+    downloads_used: used,
+    max_downloads: max,
+    remaining,
+    expires_at: row.expires_at || null,
+    note: row.note || ''
+  });
 });
 
 app.post('/api/download/:token', async (req, res) => {
@@ -166,6 +200,23 @@ app.post('/api/aippt-download', async (req, res) => {
   try {
     const url = (req.body && (req.body.url || req.body["url"])) || '';
     if (!url) return res.status(400).json({ error: 'missing url' });
+    // Validate token from Referer or query
+    let tokenFromReferer = null;
+    try {
+      const ref = req.headers.referer || req.headers.referrer || '';
+      if (ref) {
+        const u = new URL(ref);
+        tokenFromReferer = u.searchParams.get('token');
+      }
+    } catch (_) {}
+    const token = (req.query && req.query.token) || tokenFromReferer || null;
+    if (!token) return res.status(401).json({ error: 'missing token' });
+    await db.read();
+    const row = db.data.tokens.find(t => t.token === token);
+    const validity = isTokenValid(row);
+    if (!validity.ok) {
+      return res.status(400).json({ error: '该链接无效或已过期/次数已用完' });
+    }
 
     const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: false, slowMo: 250 });
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
@@ -173,6 +224,12 @@ app.post('/api/aippt-download', async (req, res) => {
     const stream = fs.createReadStream(filePath);
     stream.on('close', () => cleanup());
     stream.pipe(res);
+    // increment usage after piping starts
+    const idx = db.data.tokens.findIndex(t => t && row && t.id === row.id);
+    if (idx >= 0) {
+      db.data.tokens[idx].downloads_used += 1;
+      await db.write();
+    }
   } catch (err) {
     return res.status(500).json({ error: err.message || '下载失败' });
   }
