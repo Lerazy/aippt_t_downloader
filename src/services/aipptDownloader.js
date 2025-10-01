@@ -72,18 +72,23 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     });
 
     // Go to template page directly
+    const t0 = Date.now();
+    console.log('[timing] Starting download process');
     await page.goto(templateUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    console.log('[timing] Page loaded:', Date.now() - t0, 'ms');
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    console.log('[timing] Network idle:', Date.now() - t0, 'ms');
     // Ensure page is fully settled (post-DOM ready and quiet network)
-    async function waitForPageSettled(extraDelayMs = 250) {
-      try { await page.waitForLoadState('domcontentloaded', { timeout: 10000 }); } catch (_) {}
-      try { await page.waitForLoadState('networkidle', { timeout: 6000 }); } catch (_) {}
-      try { await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 3000 }); } catch (_) {}
+    async function waitForPageSettled(extraDelayMs = 100) {
+      try { await page.waitForLoadState('domcontentloaded', { timeout: 5000 }); } catch (_) {}
+      try { await page.waitForLoadState('networkidle', { timeout: 2000 }); } catch (_) {}
+      try { await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 2000 }); } catch (_) {}
       if (extraDelayMs > 0) { await page.waitForTimeout(extraDelayMs).catch(() => {}); }
     }
-    await waitForPageSettled(250);
+    await waitForPageSettled(100);
+    console.log('[timing] Page settled:', Date.now() - t0, 'ms');
     // Avoid full-page scroll; we'll scroll specific targets into view when needed
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
 
     // 1) Detect login state via the given login/register button text (exact text preferred)
     let loginRegisterBtn = page.locator('button:has-text("登录 ｜ 注册")').first();
@@ -92,6 +97,7 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       loginRegisterBtn = page.locator('button:has-text("登录")').filter({ hasText: '注册' }).first();
     }
     const isLoginRequired = (await loginRegisterBtn.count()) > 0;
+    console.log('[timing] Login check complete, isLoginRequired:', isLoginRequired, Date.now() - t0, 'ms');
 
     async function clickImmediateDownload() {
       // target download button as specified
@@ -119,7 +125,7 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       }, { timeout: 60000 }).catch(() => null);
       let clicked = false;
       // small grace period to allow lazy components to mount
-      await waitForPageSettled(150);
+      await waitForPageSettled(50);
       for (const sel of candidates) {
         const loc = page.locator(sel).first();
         if ((await loc.count()) > 0) {
@@ -164,10 +170,12 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
           return false;
         });
       }
-      if (!clicked) throw new Error('未找到“立即下载”按钮');
+      if (!clicked) throw new Error('未找到"立即下载"按钮');
+      console.log('[timing] Download button clicked:', Date.now() - t0, 'ms');
       // Post click short wait
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(100);
       let download = await downloadListener;
+      console.log('[timing] Download listener resolved:', Date.now() - t0, 'ms', download ? 'SUCCESS' : 'NO_DOWNLOAD');
       if (!download) {
         // try popup page scenario
         const popup = await popupListener;
@@ -193,12 +201,14 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     let download = null;
     if (!isLoginRequired) {
       // if already logged in -> ensure settled then click download
-      await waitForPageSettled(250);
+      await waitForPageSettled(100);
+      console.log('[timing] Starting download attempt:', Date.now() - t0, 'ms');
       // retry a few times in case components mount slowly
       for (let i = 0; i < 3 && !download; i++) {
+        console.log('[timing] Download attempt', i + 1);
         download = await clickImmediateDownload().catch(() => null);
         if (!download) {
-          await waitForPageSettled(200);
+          await waitForPageSettled(100);
         }
       }
     } else {
@@ -219,15 +229,15 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       } else {
         await page.locator('button.ant-btn.ant-btn-primary[type="submit"]').first().click({ timeout: 10000 }).catch(() => {});
       }
-      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-      await waitForPageSettled(300);
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+      await waitForPageSettled(150);
       // Save storage state after login so future runs reuse the session
       try { await context.storageState({ path: stateFile }); } catch (_) {}
       // After login, click immediate download with retries to handle slow rendering
       for (let i = 0; i < 3 && !download; i++) {
         download = await clickImmediateDownload().catch(() => null);
         if (!download) {
-          await waitForPageSettled(250);
+          await waitForPageSettled(100);
         }
       }
     }
@@ -235,11 +245,14 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     if (!download) {
       throw new Error('下载未开始');
     }
+    console.log('[timing] Download object obtained:', Date.now() - t0, 'ms');
     // If it's a Playwright Download object
     if (typeof download.suggestedFilename === 'function') {
       const suggested = download.suggestedFilename();
       const filePath = path.join(tmpDir, suggested || 'aippt-download');
+      console.log('[timing] Saving file:', suggested);
       await download.saveAs(filePath);
+      console.log('[timing] File saved, total time:', Date.now() - t0, 'ms');
       return { filePath, filename: path.basename(filePath), cleanup: () => fs.rmSync(tmpDir, { recursive: true, force: true }) };
     }
     // Otherwise treat it as a Response
