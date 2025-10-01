@@ -74,21 +74,21 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     // Go to template page directly
     const t0 = Date.now();
     console.log('[timing] Starting download process');
-    await page.goto(templateUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.goto(templateUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     console.log('[timing] Page loaded:', Date.now() - t0, 'ms');
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => {});
     console.log('[timing] Network idle:', Date.now() - t0, 'ms');
     // Ensure page is fully settled (post-DOM ready and quiet network)
-    async function waitForPageSettled(extraDelayMs = 100) {
-      try { await page.waitForLoadState('domcontentloaded', { timeout: 5000 }); } catch (_) {}
-      try { await page.waitForLoadState('networkidle', { timeout: 2000 }); } catch (_) {}
-      try { await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 2000 }); } catch (_) {}
+    async function waitForPageSettled(extraDelayMs = 50) {
+      try { await page.waitForLoadState('domcontentloaded', { timeout: 3000 }); } catch (_) {}
+      try { await page.waitForLoadState('networkidle', { timeout: 1000 }); } catch (_) {}
+      try { await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 1000 }); } catch (_) {}
       if (extraDelayMs > 0) { await page.waitForTimeout(extraDelayMs).catch(() => {}); }
     }
-    await waitForPageSettled(100);
+    await waitForPageSettled(50);
     console.log('[timing] Page settled:', Date.now() - t0, 'ms');
     // Avoid full-page scroll; we'll scroll specific targets into view when needed
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(50);
 
     // 1) Detect login state via the given login/register button text (exact text preferred)
     let loginRegisterBtn = page.locator('button:has-text("登录 ｜ 注册")').first();
@@ -125,7 +125,7 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       }, { timeout: 60000 }).catch(() => null);
       let clicked = false;
       // small grace period to allow lazy components to mount
-      await waitForPageSettled(50);
+      await waitForPageSettled(30);
       for (const sel of candidates) {
         const loc = page.locator(sel).first();
         if ((await loc.count()) > 0) {
@@ -173,7 +173,7 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       if (!clicked) throw new Error('未找到"立即下载"按钮');
       console.log('[timing] Download button clicked:', Date.now() - t0, 'ms');
       // Post click short wait
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(50);
       let download = await downloadListener;
       console.log('[timing] Download listener resolved:', Date.now() - t0, 'ms', download ? 'SUCCESS' : 'NO_DOWNLOAD');
       if (!download) {
@@ -201,14 +201,14 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     let download = null;
     if (!isLoginRequired) {
       // if already logged in -> ensure settled then click download
-      await waitForPageSettled(100);
+      await waitForPageSettled(50);
       console.log('[timing] Starting download attempt:', Date.now() - t0, 'ms');
       // retry a few times in case components mount slowly
       for (let i = 0; i < 3 && !download; i++) {
         console.log('[timing] Download attempt', i + 1);
         download = await clickImmediateDownload().catch(() => null);
         if (!download) {
-          await waitForPageSettled(100);
+          await waitForPageSettled(50);
         }
       }
     } else {
@@ -229,15 +229,15 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       } else {
         await page.locator('button.ant-btn.ant-btn-primary[type="submit"]').first().click({ timeout: 10000 }).catch(() => {});
       }
-      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-      await waitForPageSettled(150);
+      await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+      await waitForPageSettled(100);
       // Save storage state after login so future runs reuse the session
       try { await context.storageState({ path: stateFile }); } catch (_) {}
       // After login, click immediate download with retries to handle slow rendering
       for (let i = 0; i < 3 && !download; i++) {
         download = await clickImmediateDownload().catch(() => null);
         if (!download) {
-          await waitForPageSettled(100);
+          await waitForPageSettled(50);
         }
       }
     }

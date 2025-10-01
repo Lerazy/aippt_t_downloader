@@ -1,18 +1,27 @@
 {
   "tokens": [
     {
-      "id": 12,
-      "token": "AFJR-QIJoxGUZ6KW4oGv5UvU",
+      "id": 13,
+      "token": "PuXGtpbRI0H-J_h8M_knSuKG",
+      "max_downloads": 5,
+      "downloads_used": 5,
+      "expires_at": "2025-10-29",
+      "note": "一次\n",
+      "created_at": "2025-10-01T16:42:07.094Z"
+    },
+    {
+      "id": 14,
+      "token": "tOhae7aTp5g0GU-vL_rEJGxJ",
       "max_downloads": null,
-      "downloads_used": 21,
+      "downloads_used": 1,
       "expires_at": null,
       "note": "",
-      "created_at": "2025-09-30T06:39:14.373Z"
+      "created_at": "2025-10-01T17:44:44.409Z"
     }
   ],
-  "seq": 12,
+  "seq": 14,
   "stats": {
-    "totalDownloads": 17,
-    "totalBytes": 455675456
+    "totalDownloads": 23,
+    "totalBytes": 601530844
   }
 }
