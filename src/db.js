@@ -17,7 +17,7 @@ export function getDb() {
   }
   const dbPath = path.join(dataDir, 'app.json');
   const adapter = new JSONFile(dbPath);
-  const db = new Low(adapter, { tokens: [], seq: 0 });
+  const db = new Low(adapter, { tokens: [], seq: 0, stats: { totalDownloads: 0, totalBytes: 0 } });
   dbInstance = db;
   return dbInstance;
 }
@@ -25,7 +25,11 @@ export function getDb() {
 export async function initDb() {
   const db = getDb();
   await db.read();
-  db.data = db.data || { tokens: [], seq: 0 };
+  db.data = db.data || { tokens: [], seq: 0, stats: { totalDownloads: 0, totalBytes: 0 } };
+  // Backfill missing fields for older data files
+  if (!db.data.stats) {
+    db.data.stats = { totalDownloads: 0, totalBytes: 0 };
+  }
   await db.write();
   return db;
 }

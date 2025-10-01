@@ -45,7 +45,7 @@
     th { background: #0f1724; text-align: left; color: var(--muted); font-weight: 600; }
     tr:nth-child(odd) td { background: rgba(255,255,255,0.04); }
     code { background: #0f1724; padding: 2px 6px; border-radius: 6px; }
-    .toolbar { display:flex; gap:8px; align-items:center; margin: 10px 0; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin: 10px 0; overflow:auto; }
     .toolbar input { flex: 1; }
     .btn-danger { background: linear-gradient(135deg, var(--danger), #e25555); box-shadow: 0 6px 18px rgba(255,107,107,0.25); }
     @media (max-width: 900px) { form { grid-template-columns: 1fr; } .row-1col { grid-column: span 1; } }
@@ -82,12 +82,16 @@
 
     <div class="panel">
       <h2 style="margin:0 0 8px">链接列表</h2>
+      <div id="stats" style="margin-bottom:10px; color: var(--muted); font-size: 13px;">
+        加载统计中...
+      </div>
       <div class="toolbar">
         <input id="search" placeholder="搜索 token 或备注" />
         <button id="btnSearch">搜索</button>
         <button id="btnClear">清空</button>
       </div>
-      <table id="tbl">
+      <div style="overflow:auto; -webkit-overflow-scrolling: touch; border-radius:10px;">
+      <table id="tbl" style="min-width:860px;">
       <thead>
         <tr>
           <th>Token</th>
@@ -102,6 +106,7 @@
       </thead>
       <tbody></tbody>
       </table>
+      </div>
     </div>
   </div>
   <script>
@@ -140,6 +145,22 @@
           refresh();
         });
       });
+      // refresh stats
+      try {
+        const s = await fetch('/api/admin/stats');
+        const sj = await s.json();
+        const bytes = Number(sj.totalBytes || 0);
+        // format bytes
+        function formatBytes(b) {
+          if (b < 1024) return `${b} B`;
+          if (b < 1024*1024) return `${(b/1024).toFixed(1)} KB`;
+          if (b < 1024*1024*1024) return `${(b/1024/1024).toFixed(1)} MB`;
+          return `${(b/1024/1024/1024).toFixed(2)} GB`;
+        }
+        document.getElementById('stats').textContent = `下载成功次数：${sj.totalDownloads || 0}，累计流量：${formatBytes(bytes)}`;
+      } catch (_) {
+        document.getElementById('stats').textContent = '';
+      }
     }
     refresh();
 
@@ -155,8 +176,34 @@
       const json = await res.json();
       const div = document.getElementById('created');
       if (json.data) {
-        div.style.display = 'block';
-        div.innerHTML = json.data.map(x => `<div><a href="${x.url}" target="_blank">${x.url}</a></div>`).join('');
+        // Keep created links panel hidden; download handled via backend export
+        div.style.display = 'none';
+        div.innerHTML = '';
+        // Request backend to export a TXT (better on mobile/tablet and preserves headers/encoding)
+        try {
+          const resp = await fetch('/api/admin/links/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens: (json.data || []).map(x => x.token),
+              count: body.count,
+              expiresAt: body.expiresAt,
+              maxDownloads: body.maxDownloads,
+              note: body.note
+            })
+          });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const a = document.createElement('a');
+            const urlObj = URL.createObjectURL(blob);
+            a.href = urlObj;
+            a.download = '';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(urlObj), 1000);
+          }
+        } catch (_) {}
       }
       refresh();
     });

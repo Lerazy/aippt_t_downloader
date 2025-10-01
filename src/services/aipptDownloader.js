@@ -40,9 +40,8 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       if (extraDelayMs > 0) { await page.waitForTimeout(extraDelayMs).catch(() => {}); }
     }
     await waitForPageSettled(800);
-    // Initial scroll to ensure lazy content appears
-    await page.keyboard.press('End').catch(() => {});
-    await page.waitForTimeout(500);
+    // Avoid full-page scroll; we'll scroll specific targets into view when needed
+    await page.waitForTimeout(200);
 
     // 1) Detect login state via the given login/register button text (exact text preferred)
     let loginRegisterBtn = page.locator('button:has-text("登录 ｜ 注册")').first();

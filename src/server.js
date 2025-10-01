@@ -123,6 +123,28 @@ app.post('/api/admin/links', requireAdminAuth, async (req, res) => {
   res.json({ data: links });
 });
 
+// Export a TXT for a given list of tokens (does not create new tokens)
+// POST body: { tokens: string[], count, expiresAt, maxDownloads, note }
+app.post('/api/admin/links/export', requireAdminAuth, async (req, res) => {
+  const { tokens = [], count = null, expiresAt = null, maxDownloads = null, note = '' } = req.body || {};
+  if (!Array.isArray(tokens) || tokens.length === 0) {
+    return res.status(400).json({ error: 'tokens is required' });
+  }
+  const baseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+  const urls = tokens.map(t => `${baseUrl}/download?token=${encodeURIComponent(String(t))}`);
+  const countLine = count != null ? Number(count) : urls.length;
+  const expires = expiresAt ? String(expiresAt) : '不限';
+  const limit = (maxDownloads != null && maxDownloads !== '') ? String(maxDownloads) : '不限';
+  const noteStr = (note || '').trim() || '无';
+  const header = `生成数量：${countLine}，有效期：${expires}，下载次数限制：${limit}，备注：${noteStr}`;
+  const content = [header, ...urls].join('\n');
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  const now = new Date();
+  const fname = `aippt-links-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.txt`;
+  res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+  res.status(200).send(content);
+});
+
 // User APIs
 app.get('/api/token/:token', async (req, res) => {
   const { token } = req.params;
@@ -156,6 +178,9 @@ app.post('/api/download/:token', async (req, res) => {
   const idx = db.data.tokens.findIndex(t => t.id === row.id);
   if (idx >= 0) {
     db.data.tokens[idx].downloads_used += 1;
+    // stats: increment downloads
+    db.data.stats = db.data.stats || { totalDownloads: 0, totalBytes: 0 };
+    db.data.stats.totalDownloads += 1;
     await db.write();
   }
 
@@ -164,8 +189,17 @@ app.post('/api/download/:token', async (req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.status(200);
-  res.write('这是一个示例文件。实际集成可替换为从 aippt.cn 自动化下载的内容。');
+  const content = '这是一个示例文件。实际集成可替换为从 aippt.cn 自动化下载的内容。';
+  const buf = Buffer.from(content, 'utf-8');
+  res.write(buf);
   res.end();
+  // update bytes after response sent
+  try {
+    await db.read();
+    db.data.stats = db.data.stats || { totalDownloads: 0, totalBytes: 0 };
+    db.data.stats.totalBytes += buf.length;
+    await db.write();
+  } catch (_) {}
 });
 
 // Automated download from aippt.cn by URL (requires valid token via query)
@@ -189,6 +223,8 @@ app.get('/api/aippt-download', async (req, res) => {
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(filePath);
     stream.on('close', () => cleanup());
+    let sentBytes = 0;
+    stream.on('data', (chunk) => { sentBytes += chunk.length; });
     stream.pipe(res);
   } catch (err) {
     return res.status(500).json({ error: err.message || '下载失败' });
@@ -223,16 +259,39 @@ app.post('/api/aippt-download', async (req, res) => {
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(filePath);
     stream.on('close', () => cleanup());
+    let sentBytes = 0;
+    stream.on('data', (chunk) => { sentBytes += chunk.length; });
     stream.pipe(res);
     // increment usage after piping starts
     const idx = db.data.tokens.findIndex(t => t && row && t.id === row.id);
     if (idx >= 0) {
       db.data.tokens[idx].downloads_used += 1;
+      // stats: increment downloads & bytes after response ends
+      db.data.stats = db.data.stats || { totalDownloads: 0, totalBytes: 0 };
+      db.data.stats.totalDownloads += 1;
       await db.write();
+      res.on('finish', async () => {
+        try {
+          await db.read();
+          db.data.stats = db.data.stats || { totalDownloads: 0, totalBytes: 0 };
+          db.data.stats.totalBytes += sentBytes;
+          await db.write();
+        } catch (_) {}
+      });
     }
   } catch (err) {
     return res.status(500).json({ error: err.message || '下载失败' });
   }
+});
+
+// Admin stats
+app.get('/api/admin/stats', requireAdminAuth, async (req, res) => {
+  await db.read();
+  const s = db.data.stats || { totalDownloads: 0, totalBytes: 0 };
+  res.json({
+    totalDownloads: s.totalDownloads || 0,
+    totalBytes: s.totalBytes || 0
+  });
 });
 
 // Home
