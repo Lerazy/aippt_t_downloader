@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { nanoid } from 'nanoid';
 import { getDb, initDb } from './db.js';
 import { downloadAipptTemplate } from './services/aipptDownloader.js';
+import { chromium } from 'playwright';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +51,57 @@ app.get('/admin', requireAdminAuth, (req, res) => {
 
 app.get('/download', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'download.html'));
+});
+
+// Health check & self-check
+async function runSelfCheck() {
+  const checks = {
+    env: {
+      ADMIN_USERNAME: !!process.env.ADMIN_USERNAME,
+      ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+      AIPPT_USERNAME: !!process.env.AIPPT_USERNAME,
+      AIPPT_PASSWORD: !!process.env.AIPPT_PASSWORD,
+    },
+    dataDirWritable: false,
+    playwright: { launchOk: false, error: null },
+  };
+  // data/ writable check
+  try {
+    const dataDir = path.join(__dirname, 'public', '..', 'data');
+    try { fs.mkdirSync(dataDir, { recursive: true }); } catch (_) {}
+    const testFile = path.join(dataDir, '.write-test');
+    fs.writeFileSync(testFile, String(Date.now()));
+    fs.rmSync(testFile, { force: true });
+    checks.dataDirWritable = true;
+  } catch (err) {
+    checks.dataDirWritable = false;
+  }
+  // playwright quick launch
+  try {
+    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage'] });
+    await browser.close();
+    checks.playwright.launchOk = true;
+  } catch (err) {
+    checks.playwright.launchOk = false;
+    checks.playwright.error = err && err.message ? String(err.message) : 'unknown';
+  }
+  return checks;
+}
+
+app.get('/api/health', async (req, res) => {
+  try {
+    const checks = await runSelfCheck();
+    const ok = checks.dataDirWritable && checks.playwright.launchOk;
+    res.status(ok ? 200 : 500).json({
+      ok,
+      version: process.env.npm_package_version || '0.1.0',
+      node: process.version,
+      port: process.env.PORT || 3000,
+      checks,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message || String(err) });
+  }
 });
 
 // Helpers
@@ -208,15 +260,14 @@ app.post('/api/download/:token', async (req, res) => {
 // Automated download from aippt.cn by URL (requires valid token via query)
 // GET /api/aippt-download?token=...&url=...&headful=true
 app.get('/api/aippt-download', async (req, res) => {
-  const { token, url, headful } = req.query;
+  const { token, url } = req.query;
   if (!token || !url) return res.status(400).json({ error: 'missing token or url' });
   await db.read();
   const row = db.data.tokens.find(t => t.token === token);
   const validity = isTokenValid(row);
   if (!validity.ok) return res.status(400).json({ error: '该链接无效或已过期/次数已用完' });
   try {
-    const useHeadless = headful ? false : defaultHeadless;
-    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: useHeadless });
+    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: true });
     // increment usage
     const idx = db.data.tokens.findIndex(t => t.id === row.id);
     if (idx >= 0) {
@@ -258,7 +309,7 @@ app.post('/api/aippt-download', async (req, res) => {
       return res.status(400).json({ error: '该链接无效或已过期/次数已用完' });
     }
 
-    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: defaultHeadless });
+    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: true });
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(filePath);

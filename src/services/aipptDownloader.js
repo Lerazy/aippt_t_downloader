@@ -3,6 +3,37 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
+let sharedBrowser = null;
+let launchingBrowser = null;
+
+async function getSharedBrowser(headless, slowMo) {
+  if (sharedBrowser && sharedBrowser.isConnected()) return sharedBrowser;
+  if (launchingBrowser) {
+    try { await launchingBrowser; } catch (_) { /* ignore */ }
+    if (sharedBrowser && sharedBrowser.isConnected()) return sharedBrowser;
+  }
+  launchingBrowser = chromium.launch({
+    headless,
+    slowMo,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-zygote'
+    ]
+  }).then((b) => {
+    sharedBrowser = b;
+    launchingBrowser = null;
+    try {
+      b.on('disconnected', () => { sharedBrowser = null; });
+    } catch (_) {}
+    return b;
+  }).catch((e) => { launchingBrowser = null; throw e; });
+  sharedBrowser = await launchingBrowser;
+  return sharedBrowser;
+}
+
 export async function downloadAipptTemplate(templateUrl, options = {}) {
   if (!/^https?:\/\//.test(templateUrl)) {
     throw new Error('Invalid template URL');
@@ -15,14 +46,25 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aippt-'));
   const headlessEnv = process.env.PLAYWRIGHT_HEADLESS;
   const headless = options.headless ?? (headlessEnv ? headlessEnv !== 'false' : true);
-  const slowMo = options.slowMo ?? (headless ? 0 : 200);
-  const browser = await chromium.launch({ headless, slowMo });
+  const slowMo = options.slowMo ?? 0;
+  let browser = await getSharedBrowser(headless, slowMo);
   // Persist session between runs via storage state
   const dataDir = path.join(process.cwd(), 'data');
   try { fs.mkdirSync(dataDir, { recursive: true }); } catch (_) {}
   const stateFile = path.join(dataDir, 'aippt_storage.json');
-  const context = await browser.newContext({ acceptDownloads: true, storageState: fs.existsSync(stateFile) ? stateFile : undefined });
-  const page = await context.newPage();
+  let context;
+  let page;
+  async function openContextWithRetry() {
+    try {
+      context = await browser.newContext({ acceptDownloads: true, storageState: fs.existsSync(stateFile) ? stateFile : undefined });
+    } catch (e) {
+      // Browser may have been closed/crashed; relaunch and retry once
+      browser = await getSharedBrowser(headless, slowMo);
+      context = await browser.newContext({ acceptDownloads: true, storageState: fs.existsSync(stateFile) ? stateFile : undefined });
+    }
+    page = await context.newPage();
+  }
+  await openContextWithRetry();
   try {
     // Log console messages for debugging
     page.on('console', msg => {
@@ -30,16 +72,16 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     });
 
     // Go to template page directly
-    await page.goto(templateUrl, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.goto(templateUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     // Ensure page is fully settled (post-DOM ready and quiet network)
-    async function waitForPageSettled(extraDelayMs = 800) {
+    async function waitForPageSettled(extraDelayMs = 250) {
       try { await page.waitForLoadState('domcontentloaded', { timeout: 10000 }); } catch (_) {}
-      try { await page.waitForLoadState('networkidle', { timeout: 15000 }); } catch (_) {}
-      try { await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 5000 }); } catch (_) {}
+      try { await page.waitForLoadState('networkidle', { timeout: 6000 }); } catch (_) {}
+      try { await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 3000 }); } catch (_) {}
       if (extraDelayMs > 0) { await page.waitForTimeout(extraDelayMs).catch(() => {}); }
     }
-    await waitForPageSettled(800);
+    await waitForPageSettled(250);
     // Avoid full-page scroll; we'll scroll specific targets into view when needed
     await page.waitForTimeout(200);
 
@@ -75,13 +117,9 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
         } catch (_) {}
         return false;
       }, { timeout: 60000 }).catch(() => null);
-      // Take a pre-click screenshot for diagnostics
-      try {
-        await page.screenshot({ path: path.join(tmpDir, 'before-click.png'), fullPage: true });
-      } catch (_) {}
       let clicked = false;
       // small grace period to allow lazy components to mount
-      await waitForPageSettled(400);
+      await waitForPageSettled(150);
       for (const sel of candidates) {
         const loc = page.locator(sel).first();
         if ((await loc.count()) > 0) {
@@ -127,11 +165,8 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
         });
       }
       if (!clicked) throw new Error('未找到“立即下载”按钮');
-      // Post click wait and screenshot
-      await page.waitForTimeout(800);
-      try {
-        await page.screenshot({ path: path.join(tmpDir, 'after-click.png'), fullPage: true });
-      } catch (_) {}
+      // Post click short wait
+      await page.waitForTimeout(250);
       let download = await downloadListener;
       if (!download) {
         // try popup page scenario
@@ -158,12 +193,12 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     let download = null;
     if (!isLoginRequired) {
       // if already logged in -> ensure settled then click download
-      await waitForPageSettled(1000);
+      await waitForPageSettled(250);
       // retry a few times in case components mount slowly
-      for (let i = 0; i < 5 && !download; i++) {
+      for (let i = 0; i < 3 && !download; i++) {
         download = await clickImmediateDownload().catch(() => null);
         if (!download) {
-          await waitForPageSettled(600);
+          await waitForPageSettled(200);
         }
       }
     } else {
@@ -184,15 +219,15 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
       } else {
         await page.locator('button.ant-btn.ant-btn-primary[type="submit"]').first().click({ timeout: 10000 }).catch(() => {});
       }
-      await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
-      await waitForPageSettled(1200);
+      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+      await waitForPageSettled(300);
       // Save storage state after login so future runs reuse the session
       try { await context.storageState({ path: stateFile }); } catch (_) {}
       // After login, click immediate download with retries to handle slow rendering
-      for (let i = 0; i < 6 && !download; i++) {
+      for (let i = 0; i < 3 && !download; i++) {
         download = await clickImmediateDownload().catch(() => null);
         if (!download) {
-          await waitForPageSettled(800);
+          await waitForPageSettled(250);
         }
       }
     }
@@ -226,7 +261,7 @@ export async function downloadAipptTemplate(templateUrl, options = {}) {
     return { filePath, filename: path.basename(filePath), cleanup: () => fs.rmSync(tmpDir, { recursive: true, force: true }) };
   } finally {
     await context.close().catch(() => {});
-    await browser.close().catch(() => {});
+    // Keep shared browser running for reuse
   }
 }
 
