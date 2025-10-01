@@ -15,6 +15,9 @@ const app = express();
 const db = getDb();
 await initDb();
 
+// Runtime options
+const defaultHeadless = String(process.env.HEADLESS || 'true').toLowerCase() !== 'false';
+
 // Middleware
 app.use(morgan('dev'));
 app.use(express.json());
@@ -212,7 +215,8 @@ app.get('/api/aippt-download', async (req, res) => {
   const validity = isTokenValid(row);
   if (!validity.ok) return res.status(400).json({ error: '该链接无效或已过期/次数已用完' });
   try {
-    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: headful ? false : undefined });
+    const useHeadless = headful ? false : defaultHeadless;
+    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: useHeadless });
     // increment usage
     const idx = db.data.tokens.findIndex(t => t.id === row.id);
     if (idx >= 0) {
@@ -254,7 +258,7 @@ app.post('/api/aippt-download', async (req, res) => {
       return res.status(400).json({ error: '该链接无效或已过期/次数已用完' });
     }
 
-    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: false, slowMo: 250 });
+    const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: defaultHeadless });
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(filePath);
