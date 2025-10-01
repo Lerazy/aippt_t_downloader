@@ -30,46 +30,82 @@
       width: 720px; max-width: 100%;
       background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
       border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 14px; padding: 24px; box-shadow: var(--shadow);
-      backdrop-filter: blur(8px);
+      border-radius: 16px; padding: 28px; box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
       display: flex; flex-direction: column; align-items: center; text-align: center;
     }
     h1 { font-size: 22px; margin: 0 0 16px; text-align: center; }
     p.sub { margin: -8px 0 16px; text-align:center; color: var(--muted); font-size: 13px; }
-    .row { display:flex; gap: 12px; align-items: center; justify-content: center; width: 100%; }
+    .row { display:flex; gap: 12px; align-items: center; justify-content: center; width: 100%; margin-top: 8px; }
     .row > * { flex: 1; }
     input {
       width: 100%; padding: 12px 14px; font-size: 14px;
       background: var(--panel); color: var(--text);
-      border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
-      outline: none; transition: box-shadow .2s, border-color .2s;
+      border: 1px solid rgba(255,255,255,0.18); border-radius: 12px;
+      outline: none; transition: box-shadow .18s ease, border-color .18s ease, background .18s ease;
     }
+    input::placeholder { color: #b8c4d6; opacity: 0.8; }
+    input:hover { border-color: rgba(255,255,255,0.28); }
     input:focus { box-shadow: 0 0 0 4px var(--ring); border-color: var(--accent); background: #1d2a40; }
     button {
-      padding: 12px 16px; font-size: 15px; border: none; border-radius: 10px; cursor: pointer; white-space: nowrap;
+      padding: 12px 16px; font-size: 15px; border: none; border-radius: 12px; cursor: pointer; white-space: nowrap;
       background: linear-gradient(135deg, var(--accent), #2e6bff);
       color: #fff; box-shadow: 0 6px 18px rgba(91,140,255,0.35);
-      transition: transform .1s ease, box-shadow .2s ease, filter .2s ease;
+      transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
     }
-    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
-    button:active { transform: translateY(0); }
+    button:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 22px rgba(91,140,255,0.45); }
+    button:active { transform: translateY(0); filter: brightness(0.98); }
     button:disabled { background: #42557a; cursor: not-allowed; box-shadow: none; }
     .actions { display:flex; gap: 12px; }
     .msg { margin-top: 10px; min-height: 24px; text-align: center; color: var(--danger); }
     #quota { color: var(--accent-2) !important; }
     .tips { margin-top: 12px; font-size: 12px; color: var(--muted); text-align:center; }
     @media (max-width: 720px) { .row { flex-direction: column; } .actions { flex-direction: column; } }
+    /* Video embed */
+    .video-wrap { width: 100%; margin-top: 14px; margin-bottom: 6px; }
+    .player-box { position: relative; width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.16); background: #0e1320; margin-top: 10px; }
+    .player-box::before { content: ""; display: block; padding-top: 56.25%; }
+    .player-box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    /* CTA link */
+    .cta { width: 100%; text-align: left; margin-top: 8px; }
+    .cta a {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--accent); text-decoration: none; font-weight: 600;
+      position: relative; padding: 8px 12px; border-radius: 10px;
+      background: rgba(91,140,255,0.10);
+      box-shadow: inset 0 0 0 1px rgba(91,140,255,0.25);
+      transition: background .18s ease, box-shadow .18s ease, transform .12s ease;
+    }
+    .cta a:hover { background: rgba(91,140,255,0.16); box-shadow: inset 0 0 0 1px rgba(91,140,255,0.35); }
+    .cta a:active { transform: translateY(1px); }
+    .cta a .arrow { transition: transform .18s ease; }
+    .cta a:hover .arrow { transform: translateX(3px); }
+    .cta a .hint { color: var(--muted); font-weight: 500; font-size: 12px; }
+    .cta a .sep { opacity: .6; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>下载模版</h1>
-    <p class="sub">粘贴 aippt 模板地址，系统将自动登录并下载</p>
+    <h1>AiPPT模版下载器</h1>
+    <!-- 教学视频（进入页面即展示） -->
+    <div class="video-wrap">
+      <div class="player-box" id="playerBox">
+        <iframe id="biliPlayer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;" allowfullscreen referrerpolicy="no-referrer"></iframe>
+      </div>
+    </div>
     <div class="row" style="margin-top:10px">
       <input id="tplUrl" placeholder="请输入需要下载模版的链接" />
       <div class="actions">
         <button id="btn">下载模版</button>
       </div>
+    </div>
+    <div class="cta">
+      <a href="https://www.aippt.cn/template/" target="_blank" rel="noopener noreferrer">
+        <span>前往 AiPPT 模版库挑选模版</span>
+        <span class="sep"> · </span>
+        <span class="hint">新窗口打开</span>
+        <span class="arrow">→</span>
+      </a>
     </div>
     <div id="msg" class="msg"></div>
     <div id="quota" class="msg" style="min-height:20px"></div>
@@ -78,7 +114,13 @@
     const btn = document.getElementById('btn');
     const msg = document.getElementById('msg');
     const quota = document.getElementById('quota');
+    const playerBox = document.getElementById('playerBox');
+    const biliPlayer = document.getElementById('biliPlayer');
     let currentToken = null;
+    // 固定教学视频（请将 BV 号替换为你的教程视频 BV）
+    const BILIBILI_BVID = 'BV16Bn2zvEB8';
+    const BILIBILI_EMBED = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(BILIBILI_BVID)}&page=1&high_quality=1&danmaku=0&autoplay=0`;
+    biliPlayer.src = BILIBILI_EMBED;
     async function refreshQuota() {
       if (!currentToken) return;
       try {
