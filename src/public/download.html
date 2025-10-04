@@ -129,7 +129,7 @@
     <!-- 教学视频（进入页面即展示） -->
     <div class="video-wrap">
       <div class="player-box" id="playerBox">
-        <iframe id="biliPlayer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;" allowfullscreen referrerpolicy="no-referrer"></iframe>
+        <iframe id="biliPlayer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture;" allowfullscreen referrerpolicy="no-referrer" muted="false"></iframe>
       </div>
     </div>
     <div class="row" style="margin-top:10px">
@@ -177,8 +177,8 @@
     const downloadSpeed = document.getElementById('downloadSpeed');
     let currentToken = null;
     // 固定教学视频（请将 BV 号替换为你的教程视频 BV）
-    const BILIBILI_BVID = 'BV16Bn2zvEB8';
-    const BILIBILI_EMBED = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(BILIBILI_BVID)}&page=1&high_quality=1&danmaku=0&autoplay=0`;
+    const BILIBILI_BVID = 'BV1tYxbzCE4X';
+    const BILIBILI_EMBED = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(BILIBILI_BVID)}&page=1&high_quality=1&danmaku=0&autoplay=1`;
     biliPlayer.src = BILIBILI_EMBED;
     async function refreshQuota() {
       if (!currentToken) return;
