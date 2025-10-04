@@ -288,6 +288,9 @@ app.get('/api/aippt-download', async (req, res) => {
 
 // POST /api/aippt-download  (body: url=...)  Token parsed from Referer of /download?token=...
 app.post('/api/aippt-download', async (req, res) => {
+  const startTime = Date.now();
+  console.log('[timing] POST /api/aippt-download started:', startTime);
+  
   try {
     const url = (req.body && (req.body.url || req.body["url"])) || '';
     if (!url) return res.status(400).json({ error: 'missing url' });
@@ -309,14 +312,61 @@ app.post('/api/aippt-download', async (req, res) => {
       return res.status(400).json({ error: '该链接无效或已过期/次数已用完' });
     }
 
+    console.log('[timing] Starting template download:', Date.now() - startTime, 'ms');
     const { filePath, filename, cleanup } = await downloadAipptTemplate(String(url), { headless: true });
+    console.log('[timing] Template downloaded, starting file transfer:', Date.now() - startTime, 'ms');
+    
+    // Set response headers
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
+    
+    // Add timeout to prevent hanging
+    const transferTimeout = setTimeout(() => {
+      if (!res.headersSent) {
+        console.log('[timing] Transfer timeout, cleaning up');
+        cleanup();
+        res.status(408).json({ error: 'Transfer timeout' });
+      }
+    }, 30000); // 30 second timeout
+    
     const stream = fs.createReadStream(filePath);
-    stream.on('close', () => cleanup());
     let sentBytes = 0;
-    stream.on('data', (chunk) => { sentBytes += chunk.length; });
+    let transferStartTime = Date.now();
+    
+    stream.on('open', () => {
+      console.log('[timing] File stream opened:', Date.now() - startTime, 'ms');
+    });
+    
+    stream.on('data', (chunk) => { 
+      sentBytes += chunk.length;
+      if (sentBytes % 1024 === 0) { // Log every 1KB
+        console.log('[timing] Transferred:', sentBytes, 'bytes, elapsed:', Date.now() - transferStartTime, 'ms');
+      }
+    });
+    
+    stream.on('end', () => {
+      console.log('[timing] File transfer completed:', Date.now() - startTime, 'ms, total bytes:', sentBytes);
+      clearTimeout(transferTimeout);
+    });
+    
+    stream.on('error', (err) => {
+      console.log('[timing] Stream error:', err.message, Date.now() - startTime, 'ms');
+      clearTimeout(transferTimeout);
+      cleanup();
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'File transfer error' });
+      }
+    });
+    
+    // Handle client disconnect
+    res.on('close', () => {
+      console.log('[timing] Client disconnected, cleaning up');
+      clearTimeout(transferTimeout);
+      cleanup();
+    });
+    
     stream.pipe(res);
+    
     // increment usage after piping starts
     const idx = db.data.tokens.findIndex(t => t && row && t.id === row.id);
     if (idx >= 0) {
@@ -326,6 +376,7 @@ app.post('/api/aippt-download', async (req, res) => {
       db.data.stats.totalDownloads += 1;
       await db.write();
       res.on('finish', async () => {
+        console.log('[timing] Response finished, updating stats:', Date.now() - startTime, 'ms');
         try {
           await db.read();
           db.data.stats = db.data.stats || { totalDownloads: 0, totalBytes: 0 };
@@ -335,6 +386,7 @@ app.post('/api/aippt-download', async (req, res) => {
       });
     }
   } catch (err) {
+    console.log('[timing] Download error:', err.message, Date.now() - startTime, 'ms');
     return res.status(500).json({ error: err.message || '下载失败' });
   }
 });
