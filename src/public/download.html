@@ -246,6 +246,8 @@
       const u = document.getElementById('tplUrl').value;
       if (!u) { msg.textContent = '请先填写模版链接'; return; }
       
+      msg.textContent = '开始下载...';
+      
       btn.disabled = true;
       showProgress();
       

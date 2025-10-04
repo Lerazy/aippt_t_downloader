@@ -3,6 +3,7 @@ import express from 'express';
 import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
+import https from 'https';
 import { fileURLToPath } from 'url';
 import { nanoid } from 'nanoid';
 import { getDb, initDb } from './db.js';
@@ -173,7 +174,7 @@ app.post('/api/admin/links', requireAdminAuth, async (req, res) => {
     created.push({ token });
   }
   await db.write();
-  const baseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.PUBLIC_BASE_URL || 'https://localhost:3443';
   const links = created.map(x => ({ token: x.token, url: `${baseUrl}/download?token=${encodeURIComponent(x.token)}` }));
   res.json({ data: links });
 });
@@ -185,7 +186,7 @@ app.post('/api/admin/links/export', requireAdminAuth, async (req, res) => {
   if (!Array.isArray(tokens) || tokens.length === 0) {
     return res.status(400).json({ error: 'tokens is required' });
   }
-  const baseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.PUBLIC_BASE_URL || 'https://localhost:3443';
   const urls = tokens.map(t => `${baseUrl}/download?token=${encodeURIComponent(String(t))}`);
   const countLine = count != null ? Number(count) : urls.length;
   const expires = expiresAt ? String(expiresAt) : '不限';
@@ -318,7 +319,11 @@ app.post('/api/aippt-download', async (req, res) => {
     
     // Set response headers
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     
     // Add file size for progress tracking
     try {
@@ -416,9 +421,41 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+
+// 检查SSL证书是否存在
+const sslKeyPath = path.join(__dirname, '..', 'ssl', 'private-key.pem');
+const sslCertPath = path.join(__dirname, '..', 'ssl', 'certificate.pem');
+
+if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+  // 启动HTTPS服务器
+  const options = {
+    key: fs.readFileSync(sslKeyPath),
+    cert: fs.readFileSync(sslCertPath)
+  };
+  
+  https.createServer(options, app).listen(HTTPS_PORT, () => {
+    console.log(`HTTPS Server listening on https://localhost:${HTTPS_PORT}`);
+  });
+  
+  // 同时启动HTTP服务器（重定向到HTTPS）
+  app.listen(PORT, () => {
+    console.log(`HTTP Server listening on http://localhost:${PORT} (redirects to HTTPS)`);
+  });
+  
+  // HTTP重定向到HTTPS
+  app.use((req, res, next) => {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      return next();
+    }
+    return res.redirect(`https://${req.headers.host.replace(/:\d+$/, `:${HTTPS_PORT}`)}${req.url}`);
+  });
+} else {
+  // 如果没有SSL证书，只启动HTTP服务器
+  app.listen(PORT, () => {
+    console.log(`HTTP Server listening on http://localhost:${PORT}`);
+    console.log('SSL certificates not found, running in HTTP mode only');
+  });
+}
 
 
