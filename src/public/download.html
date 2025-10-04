@@ -126,6 +126,11 @@
 <body>
   <div class="card">
     <h1>AiPPT模版下载器</h1>
+    <!-- 声音提示 -->
+    <div id="soundTip" style="background: rgba(91,140,255,0.1); border: 1px solid rgba(91,140,255,0.3); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+      <span>🔊</span>
+      <span>点击视频区域启用声音播放</span>
+    </div>
     <!-- 教学视频（进入页面即展示） -->
     <div class="video-wrap">
       <div class="player-box" id="playerBox">
@@ -180,6 +185,48 @@
     const BILIBILI_BVID = 'BV1tYxbzCE4X';
     const BILIBILI_EMBED = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(BILIBILI_BVID)}&page=1&high_quality=1&danmaku=0&autoplay=1&muted=0`;
     biliPlayer.src = BILIBILI_EMBED;
+    
+    // 强制启用声音的代码
+    biliPlayer.onload = function() {
+      try {
+        // 尝试通过postMessage与B站播放器通信
+        setTimeout(() => {
+          biliPlayer.contentWindow.postMessage({
+            command: 'unmute'
+          }, '*');
+        }, 1000);
+      } catch (e) {
+        console.log('无法直接控制播放器声音');
+      }
+    };
+    
+    // 页面加载完成后尝试启用声音
+    window.addEventListener('load', function() {
+      setTimeout(() => {
+        try {
+          // 尝试点击播放器区域来激活声音
+          biliPlayer.click();
+        } catch (e) {
+          console.log('无法自动激活声音');
+        }
+      }, 2000);
+    });
+    
+    // 点击视频区域时隐藏声音提示
+    playerBox.addEventListener('click', function() {
+      const soundTip = document.getElementById('soundTip');
+      if (soundTip) {
+        soundTip.style.display = 'none';
+      }
+    });
+    
+    // 监听用户交互，尝试启用声音
+    document.addEventListener('click', function() {
+      const soundTip = document.getElementById('soundTip');
+      if (soundTip && soundTip.style.display !== 'none') {
+        soundTip.style.display = 'none';
+      }
+    });
     async function refreshQuota() {
       if (!currentToken) return;
       try {
