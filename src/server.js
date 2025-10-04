@@ -320,6 +320,15 @@ app.post('/api/aippt-download', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
     
+    // Add file size for progress tracking
+    try {
+      const stats = fs.statSync(filePath);
+      res.setHeader('Content-Length', stats.size);
+      console.log('[timing] File size:', stats.size, 'bytes');
+    } catch (err) {
+      console.log('[timing] Could not get file size:', err.message);
+    }
+    
     // Add timeout to prevent hanging
     const transferTimeout = setTimeout(() => {
       if (!res.headersSent) {

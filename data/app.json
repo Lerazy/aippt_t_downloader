@@ -22,7 +22,11 @@
       "id": 15,
       "token": "os52h7VeeDJgUZr_Vn-aDRrl",
       "max_downloads": null,
+<<<<<<< HEAD
       "downloads_used": 5,
+=======
+      "downloads_used": 3,
+>>>>>>> 63e4557035453a546ae3edd699d06c4b70cd5e59
       "expires_at": null,
       "note": "",
       "created_at": "2025-10-01T19:36:08.235Z"
@@ -30,7 +34,12 @@
   ],
   "seq": 15,
   "stats": {
+<<<<<<< HEAD
     "totalDownloads": 32,
     "totalBytes": 815773300
+=======
+    "totalDownloads": 30,
+    "totalBytes": 795590518
+>>>>>>> 63e4557035453a546ae3edd699d06c4b70cd5e59
   }
 }
