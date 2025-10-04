@@ -178,7 +178,7 @@
     let currentToken = null;
     // 固定教学视频（请将 BV 号替换为你的教程视频 BV）
     const BILIBILI_BVID = 'BV1tYxbzCE4X';
-    const BILIBILI_EMBED = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(BILIBILI_BVID)}&page=1&high_quality=1&danmaku=0&autoplay=1`;
+    const BILIBILI_EMBED = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(BILIBILI_BVID)}&page=1&high_quality=1&danmaku=0&autoplay=1&muted=0`;
     biliPlayer.src = BILIBILI_EMBED;
     async function refreshQuota() {
       if (!currentToken) return;
