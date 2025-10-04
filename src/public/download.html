@@ -82,6 +82,45 @@
     .cta a:hover .arrow { transform: translateX(3px); }
     .cta a .hint { color: var(--muted); font-weight: 500; font-size: 12px; }
     .cta a .sep { opacity: .6; }
+    
+    /* Download progress animation */
+    .download-progress {
+      width: 100%; margin-top: 12px; padding: 16px;
+      background: rgba(91,140,255,0.08); border: 1px solid rgba(91,140,255,0.2);
+      border-radius: 12px; display: none; flex-direction: column; gap: 12px;
+    }
+    .progress-header {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 14px; font-weight: 600; color: var(--accent);
+    }
+    .progress-bar {
+      width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+      border-radius: 4px; overflow: hidden; position: relative;
+    }
+    .progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--accent), #7aefbd);
+      border-radius: 4px; transition: width 0.3s ease;
+      position: relative; overflow: hidden;
+    }
+    .progress-fill::after {
+      content: ''; position: absolute; top: 0; left: -100%;
+      width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+    .progress-details {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; color: var(--muted);
+    }
+    .time-estimate {
+      font-weight: 600; color: var(--accent-2);
+    }
+    .download-speed {
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -107,6 +146,21 @@
         <span class="arrow">→</span>
       </a>
     </div>
+    <!-- Download progress animation -->
+    <div id="downloadProgress" class="download-progress">
+      <div class="progress-header">
+        <span>正在下载模版</span>
+        <span id="progressPercent">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="progress-details">
+        <span class="time-estimate" id="timeEstimate">预计还需 60 秒</span>
+        <span class="download-speed" id="downloadSpeed">速度: 0 KB/s</span>
+      </div>
+    </div>
+    
     <div id="msg" class="msg"></div>
     <div id="quota" class="msg" style="min-height:20px"></div>
   </div>
@@ -116,6 +170,11 @@
     const quota = document.getElementById('quota');
     const playerBox = document.getElementById('playerBox');
     const biliPlayer = document.getElementById('biliPlayer');
+    const downloadProgress = document.getElementById('downloadProgress');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressFill = document.getElementById('progressFill');
+    const timeEstimate = document.getElementById('timeEstimate');
+    const downloadSpeed = document.getElementById('downloadSpeed');
     let currentToken = null;
     // 固定教学视频（请将 BV 号替换为你的教程视频 BV）
     const BILIBILI_BVID = 'BV16Bn2zvEB8';
@@ -157,41 +216,121 @@
       } catch (e) {}
     })();
 
+    // 基于3Mbps带宽的下载速度估算
+    const ESTIMATED_BANDWIDTH_KBPS = 375; // 3Mbps = 375KB/s
+    
+    function showProgress() {
+      downloadProgress.style.display = 'flex';
+      msg.textContent = '';
+    }
+    
+    function hideProgress() {
+      downloadProgress.style.display = 'none';
+    }
+    
+    function updateProgress(loaded, total, elapsed) {
+      if (total === 0) return;
+      
+      const percent = Math.min(100, Math.round((loaded / total) * 100));
+      const speed = elapsed > 0 ? (loaded / elapsed / 1024).toFixed(1) : 0;
+      const remaining = total - loaded;
+      const eta = remaining > 0 && speed > 0 ? Math.round(remaining / (speed * 1024)) : 0;
+      
+      progressPercent.textContent = `${percent}%`;
+      progressFill.style.width = `${percent}%`;
+      downloadSpeed.textContent = `速度: ${speed} KB/s`;
+      timeEstimate.textContent = eta > 0 ? `预计还需 ${eta} 秒` : '即将完成';
+    }
+    
     btn.addEventListener('click', async () => {
       const u = document.getElementById('tplUrl').value;
       if (!u) { msg.textContent = '请先填写模版链接'; return; }
-      msg.textContent = '开始下载...';
-      const res = await fetch('/api/aippt-download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: u })
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        msg.textContent = t || '下载失败';
-        return;
-      }
-      const blob = await res.blob();
-      // try to derive filename from Content-Disposition
-      let filename = '';
+      
+      btn.disabled = true;
+      showProgress();
+      
+      const startTime = Date.now();
+      let loaded = 0;
+      let total = 0;
+      
       try {
-        const disp = res.headers.get('Content-Disposition') || res.headers.get('content-disposition') || '';
-        const m = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disp);
-        if (m) {
-          filename = decodeURIComponent((m[1] || m[2] || '').trim());
+        const res = await fetch('/api/aippt-download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: u })
+        });
+        
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || '下载失败');
         }
-      } catch (_) {}
-      const a = document.createElement('a');
-      const urlObj = URL.createObjectURL(blob);
-      a.href = urlObj;
-      a.download = filename || 'aippt-template.pptx';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(urlObj);
-      msg.textContent = '';
-      // refresh remaining count after a short delay to allow server write
-      setTimeout(refreshQuota, 500);
+        
+        // 获取文件大小
+        const contentLength = res.headers.get('Content-Length');
+        total = contentLength ? parseInt(contentLength, 10) : 0;
+        
+        // 如果没有Content-Length，使用估算值（20MB PPTX文件）
+        if (!total) {
+          total = 20 * 1024 * 1024; // 20MB
+        }
+        
+        const reader = res.body.getReader();
+        const chunks = [];
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          chunks.push(value);
+          loaded += value.length;
+          
+          // 更新进度
+          const elapsed = (Date.now() - startTime) / 1000;
+          updateProgress(loaded, total, elapsed);
+        }
+        
+        // 合并所有chunks
+        const blob = new Blob(chunks);
+        
+        // 获取文件名
+        let filename = '';
+        try {
+          const disp = res.headers.get('Content-Disposition') || res.headers.get('content-disposition') || '';
+          const m = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disp);
+          if (m) {
+            filename = decodeURIComponent((m[1] || m[2] || '').trim());
+          }
+        } catch (_) {}
+        
+        // 下载文件
+        const a = document.createElement('a');
+        const urlObj = URL.createObjectURL(blob);
+        a.href = urlObj;
+        a.download = filename || 'aippt-template.pptx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(urlObj);
+        
+        hideProgress();
+        msg.textContent = '下载完成！';
+        msg.style.color = 'var(--accent-2)';
+        
+        // refresh remaining count after a short delay to allow server write
+        setTimeout(refreshQuota, 500);
+        
+      } catch (error) {
+        hideProgress();
+        msg.textContent = error.message || '下载失败';
+        msg.style.color = 'var(--danger)';
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => {
+          msg.textContent = '';
+          msg.style.color = '';
+        }, 3000);
+      }
     });
   </script>
 </body>
