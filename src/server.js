@@ -174,7 +174,7 @@ app.post('/api/admin/links', requireAdminAuth, async (req, res) => {
     created.push({ token });
   }
   await db.write();
-  const baseUrl = process.env.PUBLIC_BASE_URL || 'https://localhost:3443';
+  const baseUrl = process.env.PUBLIC_BASE_URL || 'http://43.138.183.172:3001';
   const links = created.map(x => ({ token: x.token, url: `${baseUrl}/download?token=${encodeURIComponent(x.token)}` }));
   res.json({ data: links });
 });
@@ -186,7 +186,7 @@ app.post('/api/admin/links/export', requireAdminAuth, async (req, res) => {
   if (!Array.isArray(tokens) || tokens.length === 0) {
     return res.status(400).json({ error: 'tokens is required' });
   }
-  const baseUrl = process.env.PUBLIC_BASE_URL || 'https://localhost:3443';
+  const baseUrl = process.env.PUBLIC_BASE_URL || 'http://43.138.183.172:3001';
   const urls = tokens.map(t => `${baseUrl}/download?token=${encodeURIComponent(String(t))}`);
   const countLine = count != null ? Number(count) : urls.length;
   const expires = expiresAt ? String(expiresAt) : '不限';
