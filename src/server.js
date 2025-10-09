@@ -188,12 +188,25 @@ app.post('/api/admin/links/export', requireAdminAuth, async (req, res) => {
   }
   const baseUrl = 'http://43.138.183.172:3001';
   const urls = tokens.map(t => `${baseUrl}/download?token=${encodeURIComponent(String(t))}`);
-  const countLine = count != null ? Number(count) : urls.length;
+  // Normalize any localhost links to the public IP for exported TXT
+  const publicHost = '43.138.183.172';
+  const urlsNormalized = urls.map(u => {
+    try {
+      const parsed = new URL(u);
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        parsed.hostname = publicHost;
+      }
+      return parsed.toString();
+    } catch (_) {
+      return u.replace('://localhost', `://${publicHost}`).replace('://127.0.0.1', `://${publicHost}`);
+    }
+  });
+  const countLine = count != null ? Number(count) : urlsNormalized.length;
   const expires = expiresAt ? String(expiresAt) : '不限';
   const limit = (maxDownloads != null && maxDownloads !== '') ? String(maxDownloads) : '不限';
   const noteStr = (note || '').trim() || '无';
   const header = `生成数量：${countLine}，有效期：${expires}，下载次数限制：${limit}，备注：${noteStr}`;
-  const content = [header, ...urls].join('\n');
+  const content = [header, ...urlsNormalized].join('\n');
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   const now = new Date();
   const fname = `aippt-links-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.txt`;

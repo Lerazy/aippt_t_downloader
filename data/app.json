@@ -53,9 +53,18 @@
       "expires_at": null,
       "note": "测试链接",
       "created_at": "2025-10-08T17:47:38.742Z"
+    },
+    {
+      "id": 19,
+      "token": "wpja3xrp0vT84kHAlf2nINCy",
+      "max_downloads": null,
+      "downloads_used": 0,
+      "expires_at": null,
+      "note": "",
+      "created_at": "2025-10-08T18:24:27.339Z"
     }
   ],
-  "seq": 18,
+  "seq": 19,
   "stats": {
     "totalDownloads": 34,
     "totalBytes": 869923736
